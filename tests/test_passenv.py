@@ -1,3 +1,5 @@
+from passenv.cli import cli, passmanager
+from click.testing import CliRunner
 import os
 import subprocess
 import sys
@@ -123,10 +125,6 @@ def test_remove_environment_preserves_other_current(empty_env):
     assert get_current() == "keep"
 
 
-from click.testing import CliRunner
-from passenv.cli import cli, passmanager
-
-
 class FakeProc:
     returncode = 0
     stdout = ""
@@ -143,11 +141,13 @@ def _invoke_pm(args, input=None):
 
 def _fake_run_pass(monkeypatch):
     calls = []
+
     def fake_run(cmd, **kwargs):
         calls.append((list(cmd), kwargs.get("env", {})))
         return FakeProc()
     monkeypatch.setattr("passenv.cli.subprocess.run", fake_run)
-    monkeypatch.setattr("passenv.cli.shutil.which", lambda name: f"/usr/bin/{name}")
+    monkeypatch.setattr("passenv.cli.shutil.which",
+                        lambda name: f"/usr/bin/{name}")
     return calls
 
 
@@ -377,7 +377,8 @@ def test_pm_add(empty_env, monkeypatch):
 
 
 def test_pm_add_no_key_aborts(empty_env, monkeypatch):
-    monkeypatch.setattr("passenv.cli.subprocess.run", lambda cmd, **kw: FakeProc())
+    monkeypatch.setattr("passenv.cli.subprocess.run",
+                        lambda cmd, **kw: FakeProc())
     r = _invoke_pm(["--add", "nokey"], input="\n")
     assert r.exit_code == 1
     assert "no GPG key" in r.output
