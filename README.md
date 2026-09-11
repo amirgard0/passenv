@@ -45,6 +45,25 @@ any shell with Python available.
 
 ## Installation
 
+### Debian / Ubuntu (APT)
+
+```bash
+curl -fsSL https://amirgard0.github.io/passenv/PASSENV-GPG-KEY \
+    | sudo gpg --dearmor -o /etc/apt/keyrings/passenv.gpg
+
+echo "deb [signed-by=/etc/apt/keyrings/passenv.gpg] \
+    https://amirgard0.github.io/passenv stable main" \
+    | sudo tee /etc/apt/sources.list.d/passenv.list
+
+sudo apt update && sudo apt install passenv
+```
+
+> The package depends on `python3-click` from your distro, so the only
+> files it installs are `passenv` itself and its two commands —
+> `passenv` and `passmanager`.
+
+### pip / pipx
+
 ```bash
 pip install passenv
 ```
@@ -55,7 +74,7 @@ Recommended, to keep the CLI isolated from your system Python:
 pipx install passenv
 ```
 
-From source:
+### From source
 
 ```bash
 git clone https://github.com/amirgard0/passenv.git
@@ -242,6 +261,56 @@ Nothing else changes — both versions use the same `~/.passenvs` layout and
 
 ---
 
+## Publishing the APT repository
+
+The APT repo is hosted on **GitHub Pages** and rebuilt automatically on every
+`v*` tag push by [`.github/workflows/apt.yml`](.github/workflows/apt.yml).
+Publishing it takes one session of setup:
+
+### 1. Generate a signing key
+
+Create a dedicated key for the repo (do **not** use your personal key):
+
+```bash
+gpg --quick-gen-key "passenv apt repo <you@example.com>" ed25519 sign 0
+```
+
+Export the private key as ASCII armor — this goes into GitHub secrets:
+
+```bash
+gpg --armor --export-secret-keys <KEYID> | sudo tee gpg-private.asc
+```
+
+### 2. Configure GitHub
+
+In **Settings → Secrets and variables → Actions**, add:
+
+| Secret           | Value                                        |
+|------------------|----------------------------------------------|
+| `GPG_PRIVATE_KEY`| the ASCII-armored private key block           |
+| `GPG_PASSPHRASE` | the key's passphrase (empty if you set none) |
+
+Then in **Settings → Pages**, set **Source: GitHub Actions**.
+
+### 3. Release
+
+```bash
+# bump version in passenv/__init__.py and pyproject.toml, commit, then:
+git tag v0.1.0
+git push origin main --tags
+```
+
+The workflow builds the `.deb`, downloads any previous versions already
+served on Pages back into the pool, re-signs the whole tree, and deploys.
+Users install as shown above. The `PASSENV-GPG-KEY` file at the repo root
+contains the public key users fetch in the install snippet.
+
+If the signing key ever needs replacing, publish a new key file and expect
+users to re-run the `gpg --dearmor` step; apt will refuse the old signatures
+otherwise.
+
+---
+
 ## Development
 
 ```bash
@@ -254,7 +323,14 @@ pip install -e ".[dev]"
 # run the test suite
 pytest
 
-# build distributable packages
+# build the Debian package locally (no debhelper needed)
+./scripts/build-deb.sh dist
+
+# build and sign a full APT repo from dist/*.deb
+gpg --quick-gen-key "test" ed25519 sign 0
+./scripts/build-apt-repo.sh <dir> <keyid>
+
+# build distributable packages (PyPI)
 pip install build
 python -m build
 ```

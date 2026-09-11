@@ -1,0 +1,81 @@
+name: Build APT repository
+
+# Builds the passenv .deb, signs an APT repository, and publishes it to
+# GitHub Pages so users can install with apt.
+#
+# One-time setup (see README "Publishing the APT repository"):
+#   1. Generate a dedicated signing key and export it as ASCII armor.
+#   2. Add repository secrets:
+#        GPG_PRIVATE_KEY       ASCII-armored private key block
+#        GPG_PASSPHRASE        its passphrase (empty if none)
+#   3. Enable GitHub Pages (Source: GitHub Actions).
+#
+# On every tag push (v*), the repo at Pages is rebuilt from all pool
+# history plus the new .deb, so old versions remain installable.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install GPG key and detect key id
+        run: |
+          echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
+          KEYID=$(gpg --list-secret-keys --with-colons \
+            | awk -F: '/^sec/{key=$5} END{print substr(key, length(key)-15)}')
+          echo "KEYID=$KEYID" >> "$GITHUB_ENV"
+          gpg --list-secret-keys --keyid-format long
+
+      - name: Build .deb
+        run: ./scripts/build-deb.sh dist
+
+      - name: Restore existing repo history
+        run: |
+          REPO=apt-repo
+          mkdir -p $REPO
+          # Reuse any existing Pages deployment so earlier versions stay
+          # available in the pool.
+          SITE=$(curl -fsSL --max-time 30 \
+            "https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY_NAME}/dists/stable/Release" \
+            >/dev/null 2>&1 && echo live || echo none)
+          if [ "$SITE" = live ]; then
+            BASE="https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY_NAME}"
+            for deb in $(curl -fsSL "$BASE/dists/stable/main/binary-all/Packages" \
+                | awk '/^Filename:/{print $2}'); do
+              mkdir -p "$REPO/$(dirname "$deb")"
+              curl -fsSL -o "$REPO/$deb" "$BASE/$deb"
+            done
+          fi
+          cp dist/*.deb "$REPO/"
+
+      - name: Sign APT repository
+        env:
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: ./scripts/build-apt-repo.sh apt-repo "$KEYID"
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: apt-repo
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
