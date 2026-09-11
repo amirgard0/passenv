@@ -1,0 +1,66 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "passenv"
+version = "0.1.0"
+description = "Manage multiple isolated pass(1) password-store environments from any shell"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [
+    { name = "Amir Hossain Zare", email = "amirgard0@gmail.com" },
+]
+keywords = [
+    "pass",
+    "password-store",
+    "password-manager",
+    "gpg",
+    "cli",
+    "password",
+    "security",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Security",
+    "Topic :: Utilities",
+]
+dependencies = [
+    "click>=8.1",
+]
+
+[project.urls]
+Homepage = "https://github.com/amirgard0/passenv"
+Repository = "https://github.com/amirgard0/passenv"
+Issues = "https://github.com/amirgard0/passenv/issues"
+Changelog = "https://github.com/amirgard0/passenv/releases"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4",
+    "pytest-cov>=4.1",
+]
+
+[project.scripts]
+passenv = "passenv.cli:cli"
+passmanager = "passenv.cli:passmanager"
+
+[tool.setuptools.packages.find]
+include = ["passenv*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --tb=short"
