@@ -147,6 +147,7 @@ def _fake_run_pass(monkeypatch):
         calls.append((list(cmd), kwargs.get("env", {})))
         return FakeProc()
     monkeypatch.setattr("passenv.cli.subprocess.run", fake_run)
+    monkeypatch.setattr("passenv.cli.shutil.which", lambda name: f"/usr/bin/{name}")
     return calls
 
 
