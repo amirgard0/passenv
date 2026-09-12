@@ -34,10 +34,27 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install GPG key and detect key id
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
         run: |
-          echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
+          if [ -z "$GPG_PRIVATE_KEY" ]; then
+            echo "::error::Secret GPG_PRIVATE_KEY is not set. See README 'Publishing the APT repository'." >&2
+            exit 1
+          fi
+          if ! printf '%s' "$GPG_PRIVATE_KEY" | gpg --batch --import 2>import.log; then
+            echo "::error::Secret GPG_PRIVATE_KEY is not a valid ASCII-armored key (got 'no valid OpenPGP data')." >&2
+            echo "::error::It must be the full output of: gpg --armor --export-secret-keys <KEYID>" >&2
+            echo "::error::Do NOT copy from CI logs (*** is masked) and do NOT paste interactively into gh; use:" >&2
+            echo "::error::  gpg --armor --export-secret-keys <KEYID> | gh secret set GPG_PRIVATE_KEY --repo amirgard0/passenv" >&2
+            sed 's/^/  /' import.log >&2
+            exit 1
+          fi
           KEYID=$(gpg --list-secret-keys --with-colons \
             | awk -F: '/^sec/{key=$5} END{print substr(key, length(key)-15)}')
+          if [ -z "$KEYID" ]; then
+            echo "::error::Key imported but no secret key detected." >&2
+            exit 1
+          fi
           echo "KEYID=$KEYID" >> "$GITHUB_ENV"
           gpg --list-secret-keys --keyid-format long
 
